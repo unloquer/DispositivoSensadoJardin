@@ -1,18 +1,25 @@
 #include "Arduino.h"
 #include "constants.h"
-#include <ESP8266WiFi.h>
+//sensor de humedad
+#include "DHT.h"
 // https://developer.ibm.com/recipes/tutorials/use-http-to-send-data-to-the-ibm-iot-foundation-from-an-esp8266/
+#include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-//
+// librerias de cliente ntp
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+
 #define errorPin 2
 WiFiClient client;
 HTTPClient http;
-
+// ntp
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
 // Example testing sketch for various DHT humidity/temperature sensors
 // Written by ladyada, public domain
 // https://github.com/adafruit/DHT-sensor-library
 
-#include "DHT.h"
+
 
 #define DHTPIN 4     // what pin we're connected to
 
@@ -47,16 +54,16 @@ int ligth_read;
   }
 */
 
-int server_request(float value) {
+int server_request(float value, String type, unsigned long time_stamp) {
 
   String url = "http://104.131.1.214:3000/api/SensorEvents";
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   //http.addHeader("X-Auth-Token", AUTH_TOKEN);
   int content_length =0;
-  String payload = String("{ \"value\": " + String(value) + ",");
-  payload += String("\"timestamp\": " + String(millis()) + ",");
-  payload += String("\"sensorId\" : \"temp_cajon_2\" }");
+  String payload = String("{ \"value\":\" " + String(value) + "\",");
+  payload += String("\"timestamp\":\"" + String(time_stamp) + "\",");
+  payload += String("\"sensorId\" :\"" + type + "\"}");
   //content_length = payload.length();
   //http.addHeader("Content-Length", String(content_length));
   int httpCode = http.POST(payload);
@@ -171,13 +178,31 @@ void setup() {
 void loop() {
   // Wait a few seconds between measurements.
   delay(2000*8);
+  // actualiza el timeClient
+  timeClient.update();
 
+  unsigned long time_to_send =   timeClient.getRawTime(); 
   // Read humidity
   float h = get_humidity();
   // Read temperature as Celsius
   float t = get_termperature();
 
-  server_request(t);
+  Serial.print(timeClient.getRawTime());
+  Serial.print("\t");
+  Serial.print(timeClient.getHours());
+  Serial.print("\t");
+  Serial.print(timeClient.getMinutes());
+  Serial.print("\t");
+  Serial.print(timeClient.getSeconds());
+  Serial.print(timeClient.getFormattedTime());
+  Serial.print("\t");
+  Serial.print(millis());
+  Serial.print("\t");
+  Serial.println(time_to_send);
+  delay(200);
+//  server_request(t, "Temperatura",time_to_send);
+ // server_request(h, "Humedad",time_to_send);
+//  server_request(t, "Luz",time_to_send);
 
   if(t >= 30.0) {
     digitalWrite(RELAY_PIN,LOW);
